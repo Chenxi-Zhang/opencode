@@ -452,6 +452,65 @@ noLLMServer.instance(
   { config: cfg },
 )
 
+noLLMServer.instance(
+  "loop exits when finished assistant parent matches latest user even if assistant ID sorts before user ID",
+  () =>
+    Effect.gen(function* () {
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const chat = yield* sessions.create({ title: "Pinned" })
+      const userID = MessageID.ascending("msg_eb58adb7d001SJfo6PpB3RPOf3")
+      const assistantID = MessageID.ascending("msg_eb58ad99e001XMErHJFzFTEXTb")
+      const userMsg = yield* sessions.updateMessage({
+        id: userID,
+        role: "user",
+        sessionID: chat.id,
+        agent: "build",
+        model: ref,
+        time: { created: Date.now() },
+      })
+      yield* sessions.updatePart({
+        id: PartID.ascending(),
+        messageID: userMsg.id,
+        sessionID: chat.id,
+        type: "text",
+        text: "quick response",
+      })
+      const assistant: SessionV1.Assistant = {
+        id: assistantID,
+        role: "assistant",
+        parentID: userMsg.id,
+        sessionID: chat.id,
+        mode: "build",
+        agent: "build",
+        cost: 0,
+        path: { cwd: "/tmp", root: "/tmp" },
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        modelID: ref.modelID,
+        providerID: ref.providerID,
+        time: { created: Date.now() },
+        finish: "stop",
+      }
+      yield* sessions.updateMessage(assistant)
+      yield* sessions.updatePart({
+        id: PartID.ascending(),
+        messageID: assistant.id,
+        sessionID: chat.id,
+        type: "text",
+        text: "I'm ready. What do you need?",
+      })
+
+      expect(userMsg.id < assistant.id).toBe(false)
+      const result = yield* prompt.loop({ sessionID: chat.id })
+      expect(result.info.id).toBe(assistant.id)
+      expect(result.info.role).toBe("assistant")
+      if (result.info.role === "assistant") expect(result.info.finish).toBe("stop")
+      expect((yield* sessions.messages({ sessionID: chat.id })).filter((msg) => msg.info.role === "assistant"))
+        .toHaveLength(1)
+    }),
+  { config: cfg },
+)
+
 it.instance("loop exits without an LLM request for interrupted orphan tool calls", () =>
   Effect.gen(function* () {
     const { llm } = yield* useServerConfig(providerCfg)
