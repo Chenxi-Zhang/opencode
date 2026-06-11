@@ -105,19 +105,6 @@ export function registerIpcHandlers(deps: Deps) {
   })
 
   ipcMain.handle(
-    "open-directory-picker",
-    async (_event: IpcMainInvokeEvent, opts?: { multiple?: boolean; title?: string; defaultPath?: string }) => {
-      const result = await dialog.showOpenDialog({
-        properties: ["openDirectory", ...(opts?.multiple ? ["multiSelections" as const] : []), "createDirectory"],
-        title: opts?.title ?? "Choose a folder",
-        defaultPath: opts?.defaultPath,
-      })
-      if (result.canceled) return null
-      return opts?.multiple ? result.filePaths : result.filePaths[0]
-    },
-  )
-
-  ipcMain.handle(
     "open-file-picker",
     async (
       event: IpcMainInvokeEvent,

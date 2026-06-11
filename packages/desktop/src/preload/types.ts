@@ -65,11 +65,6 @@ export type ElectronAPI = {
   onMenuCommand: (cb: (id: string) => void) => () => void
   onDeepLink: (cb: (urls: string[]) => void) => () => void
 
-  openDirectoryPicker: (opts?: {
-    multiple?: boolean
-    title?: string
-    defaultPath?: string
-  }) => Promise<string | string[] | null>
   openFilePicker: (opts?: {
     multiple?: boolean
     title?: string

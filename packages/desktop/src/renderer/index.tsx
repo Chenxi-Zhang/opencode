@@ -136,13 +136,6 @@ const createPlatform = (): Platform => {
     os,
     version: pkg.version,
 
-    async openDirectoryPickerDialog(opts) {
-      return window.api.openDirectoryPicker({
-        multiple: opts?.multiple ?? false,
-        title: opts?.title ?? t("desktop.dialog.chooseFolder"),
-      })
-    },
-
     async openAttachmentPickerDialog(opts, onFile) {
       const result = await window.api.openFilePicker({
         multiple: opts?.multiple ?? false,

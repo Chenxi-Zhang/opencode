@@ -6,8 +6,6 @@ import { ServerConnection } from "./server"
 import type { WslServersPlatform } from "../wsl/types"
 import type { UpdaterPlatform } from "../updater"
 
-type PickerPaths = string | string[] | null
-type OpenDirectoryPickerOptions = { title?: string; multiple?: boolean }
 type OpenAttachmentPickerOptions = {
   title?: string
   multiple?: boolean
@@ -110,15 +108,7 @@ type PlatformBase = {
   recordFatalRendererError?(error: FatalRendererErrorLog): Promise<void>
 }
 
-export type Platform = PlatformBase &
-  (
-    | { platform: "web"; os?: never }
-    | {
-        platform: "desktop"
-        os?: DesktopOS
-        openDirectoryPickerDialog(opts?: OpenDirectoryPickerOptions): Promise<PickerPaths>
-      }
-  )
+export type Platform = PlatformBase & { platform: PlatformName; os?: DesktopOS }
 
 export type DisplayBackend = "auto" | "wayland"
 
