@@ -67,11 +67,6 @@ function useEnvProxy() {
   try {
     // Electron 41.2 runs Node 24.14.1; latest @types/node@24 is 24.12.2.
     ;(http as any).setGlobalProxyFromEnv()
-    logger?.log("useEnvProxy applied", {
-      http_proxy: process.env.HTTP_PROXY,
-      https_proxy: process.env.HTTPS_PROXY,
-      no_proxy: process.env.NO_PROXY,
-    })
   } catch (error) {
     logger.warn("failed to load proxy environment", error)
   }
@@ -79,14 +74,7 @@ function useEnvProxy() {
 
 function injectWindowsSystemProxy() {
   if (process.platform !== "win32") return
-  if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) {
-    logger?.log("proxy env already set, skipping Windows registry injection", {
-      http_proxy: process.env.HTTP_PROXY,
-      https_proxy: process.env.HTTPS_PROXY,
-      no_proxy: process.env.NO_PROXY,
-    })
-    return
-  }
+  if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) return
 
   const regKey = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"
 
@@ -190,10 +178,6 @@ function ensureLoopbackNoProxy() {
 
   upsert("NO_PROXY")
   upsert("no_proxy")
-  logger?.log("ensureLoopbackNoProxy result", {
-    NO_PROXY: process.env.NO_PROXY,
-    no_proxy: process.env.no_proxy,
-  })
 }
 
 const main = Effect.gen(function* () {
