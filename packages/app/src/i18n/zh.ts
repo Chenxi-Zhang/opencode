@@ -629,6 +629,16 @@ export const dict = {
   "settings.desktop.wsl.title": "WSL 集成",
   "settings.desktop.wsl.description": "在 Windows 的 WSL 环境中运行 OpenCode 服务器。",
 
+  "settings.desktop.nativeBinary.title": "自定义服务器二进制",
+  "settings.desktop.nativeBinary.row.title": "OpenCode 可执行文件",
+  "settings.desktop.nativeBinary.row.description": "使用自定义 opencode.exe 以 Bun 运行时启动本地服务器（启用所有插件）。需要重启。",
+  "settings.desktop.nativeBinary.select": "选择",
+  "settings.desktop.nativeBinary.change": "更改",
+  "settings.desktop.nativeBinary.clear": "清除",
+  "settings.desktop.nativeBinary.picking": "选择中...",
+  "settings.desktop.nativeBinary.toast.title": "服务器二进制已更新",
+  "settings.desktop.nativeBinary.toast.description": "重启应用以使用新的服务器二进制。",
+
   "settings.general.section.appearance": "外观",
   "settings.general.section.notifications": "系统通知",
   "settings.general.section.updates": "更新",

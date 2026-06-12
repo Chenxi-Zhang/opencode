@@ -80,6 +80,15 @@ type PlatformBase = {
   /** Set the preferred display backend (desktop only) */
   setDisplayBackend?(backend: DisplayBackend): Promise<void>
 
+  /** Get the configured native server binary path (desktop only) */
+  getNativeServerBinary?(): Promise<string | null>
+
+  /** Pick a native server binary via file dialog (desktop only) */
+  pickNativeServerBinary?(): Promise<string | null>
+
+  /** Set the native server binary path (desktop only) */
+  setNativeServerBinary?(path: string | null): Promise<void>
+
   /** Parse markdown to HTML using native parser (desktop only, returns unprocessed code blocks) */
   parseMarkdown?(markdown: string): Promise<string>
 

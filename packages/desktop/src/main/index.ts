@@ -21,8 +21,12 @@ import { parseMarkdown } from "./markdown"
 import { createMenu } from "./menu"
 import {
   getDefaultServerUrl,
+  getNativeServerBinary,
+  pickNativeServerBinary,
   preferAppEnv,
   setDefaultServerUrl,
+  setNativeServerBinary,
+  spawnExternalServer,
   spawnLocalServer,
   type SidecarListener,
 } from "./server"
@@ -256,6 +260,9 @@ const main = Effect.gen(function* () {
     consumeInitialDeepLinks: () => pendingDeepLinks.splice(0),
     getDefaultServerUrl: () => getDefaultServerUrl(),
     setDefaultServerUrl: (url) => setDefaultServerUrl(url),
+    getNativeServerBinary: () => getNativeServerBinary(),
+    pickNativeServerBinary: () => pickNativeServerBinary(),
+    setNativeServerBinary: (path) => setNativeServerBinary(path),
     getDisplayBackend: async () => null,
     setDisplayBackend: async () => undefined,
     parseMarkdown: async (markdown) => parseMarkdown(markdown),
@@ -314,14 +321,24 @@ const main = Effect.gen(function* () {
     useEnvProxy()
 
     logger.log("spawning sidecar", { url })
-    const { listener, health } = yield* Effect.promise(() =>
-      spawnLocalServer(hostname, port, password, {
-        userDataPath: app.getPath("userData"),
-        onStdout: (message) => writeLog("server", "stdout", { message }),
-        onStderr: (message) => writeLog("server", "stderr", { message }, "warn"),
-        onExit: (code) => writeLog("utility", "sidecar exited", { code }, "warn"),
-      }),
-    )
+    const externalBinary = getNativeServerBinary()
+    const { listener, health } = externalBinary
+      ? yield* Effect.promise(() =>
+          spawnExternalServer(externalBinary, hostname, port, password, {
+            userDataPath: app.getPath("userData"),
+            onStdout: (message) => writeLog("server", "stdout", { message }),
+            onStderr: (message) => writeLog("server", "stderr", { message }, "warn"),
+            onExit: (code) => writeLog("utility", "external server exited", { code }, "warn"),
+          }),
+        )
+      : yield* Effect.promise(() =>
+          spawnLocalServer(hostname, port, password, {
+            userDataPath: app.getPath("userData"),
+            onStdout: (message) => writeLog("server", "stdout", { message }),
+            onStderr: (message) => writeLog("server", "stderr", { message }, "warn"),
+            onExit: (code) => writeLog("utility", "sidecar exited", { code }, "warn"),
+          }),
+        )
     server = listener
     yield* Deferred.succeed(serverReady, {
       url,

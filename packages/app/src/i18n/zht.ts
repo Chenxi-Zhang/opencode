@@ -613,6 +613,16 @@ export const dict = {
   "settings.desktop.wsl.title": "WSL 整合",
   "settings.desktop.wsl.description": "在 Windows 上的 WSL 中執行 OpenCode 伺服器。",
 
+  "settings.desktop.nativeBinary.title": "自訂伺服器二進位",
+  "settings.desktop.nativeBinary.row.title": "OpenCode 執行檔",
+  "settings.desktop.nativeBinary.row.description": "使用自訂 opencode.exe 以 Bun 執行環境啟動本地伺服器（啟用所有外掛）。需要重新啟動。",
+  "settings.desktop.nativeBinary.select": "選擇",
+  "settings.desktop.nativeBinary.change": "變更",
+  "settings.desktop.nativeBinary.clear": "清除",
+  "settings.desktop.nativeBinary.picking": "選擇中...",
+  "settings.desktop.nativeBinary.toast.title": "伺服器二進位已更新",
+  "settings.desktop.nativeBinary.toast.description": "重新啟動應用程式以使用新的伺服器二進位。",
+
   "settings.general.section.appearance": "外觀",
   "settings.general.section.notifications": "系統通知",
   "settings.general.section.updates": "更新",

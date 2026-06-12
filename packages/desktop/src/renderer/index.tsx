@@ -237,6 +237,10 @@ const createPlatform = (): Platform => {
       await window.api.setDisplayBackend(backend)
     },
 
+    getNativeServerBinary: () => window.api.getNativeServerBinary(),
+    pickNativeServerBinary: () => window.api.pickNativeServerBinary(),
+    setNativeServerBinary: (path) => window.api.setNativeServerBinary(path),
+
     parseMarkdown: (markdown: string) => window.api.parseMarkdownCommand(markdown),
 
     webviewZoom,

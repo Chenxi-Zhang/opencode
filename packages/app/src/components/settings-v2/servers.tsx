@@ -5,24 +5,30 @@ import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import fuzzysort from "fuzzysort"
-import { type Component, For, Show, createMemo } from "solid-js"
+import { type Component, For, Show, createMemo, createResource, createSignal } from "solid-js"
 import { createStore } from "solid-js/store"
 import { ServerRowMenu } from "@/components/server/server-row-menu"
 import { ServerHealthIndicator } from "@/components/server/server-row"
 import { useLanguage } from "@/context/language"
+import { usePlatform } from "@/context/platform"
 import { ServerConnection, serverName } from "@/context/server"
+import { showToast } from "@/utils/toast"
 import { useServerManagementController } from "../dialog-select-server"
 import { DialogServerV2 } from "./dialog-server-v2"
 import { SettingsListV2 } from "./parts/list"
+import { SettingsRowV2 } from "./parts/row"
 import { isWslServer, useFilteredWslServers, WslAddServerButton, WslServerSettings } from "@/wsl/settings"
 import "./settings-v2.css"
 
 export const SettingsServersV2: Component = () => {
   const dialog = useDialog()
   const language = useLanguage()
+  const platform = usePlatform()
   const controller = useServerManagementController()
   const [store, setStore] = createStore({ filter: "" })
   const wslServers = useFilteredWslServers(() => store.filter)
+
+  const isWindows = platform.os === "windows"
 
   const showSearch = createMemo(
     () => controller.sortedItems().filter((item) => !isWslServer(item)).length + wslServers().length > 1,
@@ -137,7 +143,77 @@ export const SettingsServersV2: Component = () => {
             </For>
           </SettingsListV2>
         </Show>
+        <Show when={isWindows}>
+          <NativeServerBinarySection />
+        </Show>
       </div>
     </>
+  )
+}
+
+function NativeServerBinarySection() {
+  const language = useLanguage()
+  const platform = usePlatform()
+  const [binary, { refetch: refetchBinary }] = createResource(
+    () => platform.getNativeServerBinary?.() ?? null,
+  )
+  const [picking, setPicking] = createSignal(false)
+
+  const pick = async () => {
+    setPicking(true)
+    try {
+      const result = await platform.pickNativeServerBinary?.()
+      if (result) {
+        await refetchBinary()
+        showToast({
+          variant: "success",
+          title: language.t("settings.desktop.nativeBinary.toast.title"),
+          description: language.t("settings.desktop.nativeBinary.toast.description"),
+        })
+      }
+    } catch {
+      showToast({
+        variant: "error",
+        title: language.t("common.requestFailed"),
+      })
+    } finally {
+      setPicking(false)
+    }
+  }
+
+  const clear = async () => {
+    await platform.setNativeServerBinary?.(null)
+    await refetchBinary()
+  }
+
+  return (
+    <div class="settings-v2-section">
+      <h3 class="settings-v2-section-title">{language.t("settings.desktop.nativeBinary.title")}</h3>
+      <SettingsListV2>
+        <SettingsRowV2
+          title={language.t("settings.desktop.nativeBinary.row.title")}
+          description={
+            binary()
+              ? binary()
+              : language.t("settings.desktop.nativeBinary.row.description")
+          }
+        >
+          <div class="flex items-center gap-2">
+            <ButtonV2 variant="secondary" size="small" onClick={pick} disabled={picking()}>
+              {picking()
+                ? language.t("settings.desktop.nativeBinary.picking")
+                : binary()
+                  ? language.t("settings.desktop.nativeBinary.change")
+                  : language.t("settings.desktop.nativeBinary.select")}
+            </ButtonV2>
+            <Show when={binary()}>
+              <ButtonV2 variant="ghost-muted" size="small" onClick={clear}>
+                {language.t("settings.desktop.nativeBinary.clear")}
+              </ButtonV2>
+            </Show>
+          </div>
+        </SettingsRowV2>
+      </SettingsListV2>
+    </div>
   )
 }

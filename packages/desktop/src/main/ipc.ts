@@ -27,6 +27,9 @@ type Deps = {
   consumeInitialDeepLinks: () => Promise<string[]> | string[]
   getDefaultServerUrl: () => Promise<string | null> | string | null
   setDefaultServerUrl: (url: string | null) => Promise<void> | void
+  getNativeServerBinary: () => Promise<string | null> | string | null
+  pickNativeServerBinary: () => Promise<string | null>
+  setNativeServerBinary: (path: string | null) => Promise<void> | void
   getDisplayBackend: () => Promise<string | null>
   setDisplayBackend: (backend: string | null) => Promise<void> | void
   parseMarkdown: (markdown: string) => Promise<string> | string
@@ -53,6 +56,11 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("get-display-backend", () => deps.getDisplayBackend())
   ipcMain.handle("set-display-backend", (_event: IpcMainInvokeEvent, backend: string | null) =>
     deps.setDisplayBackend(backend),
+  )
+  ipcMain.handle("get-native-server-binary", () => deps.getNativeServerBinary())
+  ipcMain.handle("pick-native-server-binary", () => deps.pickNativeServerBinary())
+  ipcMain.handle("set-native-server-binary", (_event: IpcMainInvokeEvent, path: string | null) =>
+    deps.setNativeServerBinary(path),
   )
   ipcMain.handle("parse-markdown", (_event: IpcMainInvokeEvent, markdown: string) => deps.parseMarkdown(markdown))
   ipcMain.handle("check-app-exists", (_event: IpcMainInvokeEvent, appName: string) => deps.checkAppExists(appName))
