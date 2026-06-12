@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { execSync } from "node:child_process"
 import { mkdirSync, rmSync } from "node:fs"
 import * as http from "node:http"
 import { createServer } from "node:net"
@@ -66,9 +67,96 @@ function useEnvProxy() {
   try {
     // Electron 41.2 runs Node 24.14.1; latest @types/node@24 is 24.12.2.
     ;(http as any).setGlobalProxyFromEnv()
+    logger?.log("useEnvProxy applied", {
+      http_proxy: process.env.HTTP_PROXY,
+      https_proxy: process.env.HTTPS_PROXY,
+      no_proxy: process.env.NO_PROXY,
+    })
   } catch (error) {
     logger.warn("failed to load proxy environment", error)
   }
+}
+
+function injectWindowsSystemProxy() {
+  if (process.platform !== "win32") return
+  if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) {
+    logger?.log("proxy env already set, skipping Windows registry injection", {
+      http_proxy: process.env.HTTP_PROXY,
+      https_proxy: process.env.HTTPS_PROXY,
+      no_proxy: process.env.NO_PROXY,
+    })
+    return
+  }
+
+  const regKey = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"
+
+  const read = (name: string) => {
+    try {
+      const result = execSync(`reg query "${regKey}" /v ${name}`, {
+        encoding: "utf8",
+        windowsHide: true,
+        timeout: 5000,
+      })
+      const match = result.match(/REG_SZ\s+(.+)/i)
+      return match?.[1]?.trim()
+    } catch {
+      return undefined
+    }
+  }
+
+  try {
+    const enableResult = execSync(`reg query "${regKey}" /v ProxyEnable`, {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 5000,
+    })
+    if (!/REG_DWORD\s+0x1/i.test(enableResult)) return
+  } catch {
+    return
+  }
+
+  const server = read("ProxyServer")
+  if (!server) return
+
+  const entries = server.split(";").filter(Boolean)
+  const protocolEntries = entries.filter((s) => s.includes("="))
+
+  if (protocolEntries.length > 0) {
+    for (const entry of protocolEntries) {
+      const eqIndex = entry.indexOf("=")
+      const protocol = entry.slice(0, eqIndex).trim().toLowerCase()
+      const address = entry.slice(eqIndex + 1).trim()
+      const url = address.includes("://") ? address : `http://${address}`
+      const envKey = `${protocol.toUpperCase()}_PROXY`
+      if (!process.env[envKey]) process.env[envKey] = url
+    }
+  } else {
+    const proxyUrl = server.includes("://") ? server : `http://${server}`
+    process.env.HTTP_PROXY = proxyUrl
+    process.env.HTTPS_PROXY = proxyUrl
+  }
+
+  const override = read("ProxyOverride")
+  if (override) {
+    const noProxyEntries = override
+      .split(";")
+      .map((s) => s.trim())
+      .filter((s) => Boolean(s) && s !== "<local>")
+
+    if (noProxyEntries.length > 0) {
+      const existing = (process.env.NO_PROXY ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+      process.env.NO_PROXY = [...new Set([...existing, ...noProxyEntries])].join(",")
+    }
+  }
+
+  logger?.log("injected Windows system proxy from registry", {
+    http_proxy: process.env.HTTP_PROXY,
+    https_proxy: process.env.HTTPS_PROXY,
+    no_proxy: process.env.NO_PROXY,
+  })
 }
 
 function emitDeepLinks(urls: string[]) {
@@ -102,6 +190,10 @@ function ensureLoopbackNoProxy() {
 
   upsert("NO_PROXY")
   upsert("no_proxy")
+  logger?.log("ensureLoopbackNoProxy result", {
+    NO_PROXY: process.env.NO_PROXY,
+    no_proxy: process.env.no_proxy,
+  })
 }
 
 const main = Effect.gen(function* () {
@@ -178,6 +270,7 @@ const main = Effect.gen(function* () {
     onboardingTest: Boolean(onboardingTestRoot),
   })
 
+  injectWindowsSystemProxy()
   ensureLoopbackNoProxy()
   useEnvProxy()
   app.commandLine.appendSwitch("proxy-bypass-list", "<-loopback>")
@@ -317,6 +410,7 @@ const main = Effect.gen(function* () {
   const loadingTask = yield* Effect.gen(function* () {
     logger.log("sidecar connection started", { url })
 
+    injectWindowsSystemProxy()
     ensureLoopbackNoProxy()
     useEnvProxy()
 
