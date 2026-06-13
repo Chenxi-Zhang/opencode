@@ -199,7 +199,7 @@ function NativeServerBinarySection() {
           }
         >
           <div class="flex items-center gap-2">
-            <ButtonV2 variant="secondary" size="small" onClick={pick} disabled={picking()}>
+            <ButtonV2 variant="neutral" size="small" onClick={pick} disabled={picking()}>
               {picking()
                 ? language.t("settings.desktop.nativeBinary.picking")
                 : binary()
