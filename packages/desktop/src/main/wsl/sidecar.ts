@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import { createServer } from "node:net"
 import { app } from "electron"
 import { checkHealth } from "../server"
-import { type WslCommandLine, resolveWslOpencode, shellEscape, wslArgs } from "./runtime"
+import { type WslCommandLine, createOutputDecoder, resolveWslOpencode, shellEscape, wslArgs } from "./runtime"
 import { pollWslHealth } from "./startup"
 
 export type WslSidecar = {
@@ -39,6 +39,7 @@ export async function spawnWslSidecar(
   const child = spawn("wsl", wslArgs(["bash", "-se"], distro), {
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
+    env: { ...process.env, WSL_UTF8: "1" },
   })
   child.stdin.end(script)
 
@@ -111,14 +112,16 @@ function forwardLines(
   onLine: (line: WslCommandLine) => void,
 ) {
   let pending = ""
-  stream.setEncoding("utf8")
-  stream.on("data", (chunk: string) => {
-    pending += chunk
+  const decoder = createOutputDecoder()
+  stream.on("data", (chunk: Buffer) => {
+    pending += decoder.decode(chunk)
     const lines = pending.split(/\r?\n/g)
     pending = lines.pop() ?? ""
     lines.forEach((text) => onLine({ stream: source, text }))
   })
   stream.on("end", () => {
+    const rest = decoder.flush()
+    if (rest) pending += rest
     if (pending) onLine({ stream: source, text: pending })
   })
 }

@@ -55,6 +55,7 @@ function runCommand(command: string, args: string[], opts: RunWslOptions = {}) {
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
       signal: opts.signal,
+      env: { ...process.env, WSL_UTF8: "1" },
     })
 
     // Guard every wsl.exe invocation with a timeout. When the distro or
@@ -172,7 +173,7 @@ function runInteractiveCommand(command: string, args: string[], opts: RunWslOpti
   })
 }
 
-function createOutputDecoder() {
+export function createOutputDecoder() {
   let decoder: TextDecoder | undefined
   return {
     decode(chunk: Buffer) {
