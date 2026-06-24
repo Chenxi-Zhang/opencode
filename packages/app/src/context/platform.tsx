@@ -53,6 +53,9 @@ type PlatformBase = {
     onFile: (file: File) => Promise<unknown>,
   ): Promise<void>
 
+  /** Resolve the native source path for a desktop File. */
+  getPathForFile?(file: File): string
+
   /** Open a native save file picker dialog (desktop only) */
   saveFilePickerDialog?(opts?: SaveFilePickerOptions): Promise<string | null>
 

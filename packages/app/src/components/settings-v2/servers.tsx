@@ -17,7 +17,7 @@ import { useServerManagementController } from "../dialog-select-server"
 import { DialogServerV2 } from "./dialog-server-v2"
 import { SettingsListV2 } from "./parts/list"
 import { SettingsRowV2 } from "./parts/row"
-import { isWslServer, useFilteredWslServers, WslAddServerButton, WslServerSettings } from "@/wsl/settings"
+import { AddServerMenu, isWslServer, useFilteredWslServers, WslServerSettings } from "@/wsl/settings"
 import "./settings-v2.css"
 
 export const SettingsServersV2: Component = () => {
@@ -61,10 +61,7 @@ export const SettingsServersV2: Component = () => {
       >
         <div class="settings-v2-tab-header-row">
           <h2 class="settings-v2-tab-title">{language.t("status.popover.tab.servers")}</h2>
-          <ButtonV2 variant="ghost-muted" icon="plus" onClick={openAdd}>
-            {language.t("dialog.server.add.button")}
-          </ButtonV2>
-          <WslAddServerButton />
+          <AddServerMenu onAddServer={openAdd} />
         </div>
         <Show when={showSearch()}>
           <div class="settings-v2-tab-search">
@@ -143,10 +140,11 @@ export const SettingsServersV2: Component = () => {
             </For>
           </SettingsListV2>
         </Show>
-        <Show when={isWindows}>
-          <NativeServerBinarySection />
-        </Show>
       </div>
+
+      <Show when={isWindows}>
+        <NativeServerBinarySection />
+      </Show>
     </>
   )
 }

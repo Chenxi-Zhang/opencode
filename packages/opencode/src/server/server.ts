@@ -10,7 +10,7 @@ import { HttpApiApp } from "./routes/instance/httpapi/server"
 import { disposeMiddleware } from "./routes/instance/httpapi/lifecycle"
 import { WebSocketTracker } from "./routes/instance/httpapi/websocket-tracker"
 import { PublicApi } from "./routes/instance/httpapi/public"
-import type { CorsOptions } from "./cors"
+import type { CorsOptions } from "@opencode-ai/server/cors"
 import { lazy } from "@/util/lazy"
 import { PluginClientRuntime } from "./plugin-client"
 
@@ -86,10 +86,15 @@ const listenEffect: (opts: ListenOptions) => Effect.Effect<EffectListener, unkno
     const state = yield* startWithPortFallback(opts)
     const address = yield* tcpAddress(state)
     const listenerUrl = makeURL(opts.hostname, address.port)
+    // Set the client-facing URL on the shared binding so PluginClientRuntime can
+    // proxy plugin client requests to this listener once it is ready.
+    // Uses makeClientURL (not makeURL) to normalise wildcard bind addresses
+    // (0.0.0.0 → 127.0.0.1, :: → ::1) so internal plugin connections always go
+    // through loopback even when the server binds to all interfaces.
     state.binding.url = makeClientURL(opts.hostname, address.port)
-    url = listenerUrl
 
     const unpublishMdns = yield* setupMdns(opts, address.port, state.scope)
+    url = listenerUrl
 
     return {
       hostname: opts.hostname,
@@ -177,6 +182,10 @@ function makeURL(hostname: string, port: number) {
 }
 
 function makeClientURL(hostname: string, port: number) {
+  // Normalise wildcard bind addresses to loopback so plugin client requests
+  // always target a local address. The server may bind to 0.0.0.0 or :: to
+  // accept external connections, but internal plugin traffic should never
+  // leave the machine.
   return makeURL(hostname === "0.0.0.0" ? "127.0.0.1" : hostname === "::" ? "::1" : hostname, port)
 }
 
@@ -200,7 +209,16 @@ function setupMdns(opts: ListenOptions, port: number, scope: Scope.Scope) {
 function makeStop(state: ListenerState, unpublishMdns: Effect.Effect<void>, listenerUrl: URL) {
   return Effect.gen(function* () {
     const forceCloseOnce = yield* Effect.cached(forceClose(state).pipe(Effect.ignore))
-    const closeScopeOnce = yield* Effect.cached(Scope.close(state.scope, Exit.void).pipe(Effect.ignore))
+    const closeScopeOnce = yield* Effect.cached(
+      Scope.close(state.scope, Exit.void).pipe(
+        Effect.ignore,
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (url === listenerUrl) url = undefined
+          }),
+        ),
+      ),
+    )
 
     return (close?: boolean) =>
       Effect.gen(function* () {

@@ -1,16 +1,15 @@
 import { Component, Show, createMemo, createResource, onMount } from "solid-js"
+import { createMediaQuery } from "@solid-primitives/media"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
-import { Icon } from "@opencode-ai/ui/icon"
 import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
 import { Switch } from "@opencode-ai/ui/v2/switch-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
-import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { useTheme, type ColorScheme } from "@opencode-ai/ui/theme/context"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useParams } from "@solidjs/router"
 import { useLanguage } from "@/context/language"
 import { usePermission } from "@/context/permission"
-import { usePlatform, type DisplayBackend } from "@/context/platform"
+import { usePlatform } from "@/context/platform"
 import { useServerSync } from "@/context/server-sync"
 import { useServerSDK } from "@/context/server-sdk"
 import { useUpdaterAction } from "../updater-action"
@@ -91,10 +90,10 @@ export const SettingsGeneralV2: Component = () => {
   const dialog = useDialog()
   const params = useParams()
   const settings = useSettings()
+  const mobile = createMediaQuery("(max-width: 767px)")
 
   const updater = useUpdaterAction()
 
-  const linux = createMemo(() => platform.platform === "desktop" && platform.os === "linux")
   const dir = createMemo(() => decode64(params.dir))
   const accepting = createMemo(() => {
     const value = dir()
@@ -122,32 +121,6 @@ export const SettingsGeneralV2: Component = () => {
   }
   const desktop = createMemo(() => platform.platform === "desktop")
 
-  const themeOptions = createMemo<ThemeOption[]>(() => theme.ids().map((id) => ({ id, name: theme.name(id) })))
-
-  const serverSync = useServerSync()
-  const serverSdk = useServerSDK()
-
-  const [shells] = createResource(
-    () =>
-      serverSdk.client.pty
-        .shells()
-        .then((res) => res.data ?? [])
-        .catch(() => [] as ShellOption[]),
-    { initialValue: [] as ShellOption[] },
-  )
-
-  const [displayBackend, { refetch: refetchDisplayBackend }] = createResource(
-    () => (linux() && platform.getDisplayBackend ? true : false),
-    () => Promise.resolve(platform.getDisplayBackend?.() ?? null).catch(() => null as DisplayBackend | null),
-    { initialValue: null as DisplayBackend | null },
-  )
-
-  const [pinchZoom, { mutate: setPinchZoom }] = createResource(
-    () => (desktop() && platform.getPinchZoomEnabled ? true : false),
-    () => Promise.resolve(platform.getPinchZoomEnabled?.() ?? false).catch(() => false),
-    { initialValue: false },
-  )
-
   const SETTINGS_STORE = "opencode.settings"
   const LOG_LEVEL_KEY = "logLevel"
   const [logLevel, { mutate: mutateLogLevel }] = createResource(
@@ -162,16 +135,36 @@ export const SettingsGeneralV2: Component = () => {
     { value: "ERROR", label: "Error" },
   ]
 
+  const themeOptions = createMemo<ThemeOption[]>(() => theme.ids().map((id) => ({ id, name: theme.name(id) })))
+
+  const serverSync = useServerSync()
+  const serverSdk = useServerSDK()
+
+  const [shells] = createResource(
+    () =>
+      serverSdk()
+        .client.pty.shells()
+        .then((res) => res.data ?? [])
+        .catch(() => [] as ShellOption[]),
+    { initialValue: [] as ShellOption[] },
+  )
+
+  const [pinchZoom, { mutate: setPinchZoom }] = createResource(
+    () => (desktop() && platform.getPinchZoomEnabled ? true : false),
+    () => Promise.resolve(platform.getPinchZoomEnabled?.() ?? false).catch(() => false),
+    { initialValue: false },
+  )
+
   onMount(() => {
     void theme.loadThemes()
   })
 
   const autoOption = { id: "auto", value: "", label: language.t("settings.general.row.shell.autoDefault") }
-  const currentShell = createMemo(() => serverSync.data.config.shell ?? "")
+  const currentShell = createMemo(() => serverSync().data.config.shell ?? "")
 
   const shellOptions = createMemo<ShellSelectOption[]>(() => {
     const list = shells.latest
-    const current = serverSync.data.config.shell
+    const current = serverSync().data.config.shell
 
     const nameCounts = new Map<string, number>()
     for (const s of list) {
@@ -199,14 +192,6 @@ export const SettingsGeneralV2: Component = () => {
 
     return options
   })
-
-  const onDisplayBackendChange = (checked: boolean) => {
-    const update = platform.setDisplayBackend?.(checked ? "wayland" : "auto")
-    if (!update) return
-    void update.finally(() => {
-      void refetchDisplayBackend()
-    })
-  }
 
   const onPinchZoomChange = (checked: boolean) => {
     setPinchZoom(checked)
@@ -306,7 +291,7 @@ export const SettingsGeneralV2: Component = () => {
             onSelect={(option) => {
               if (!option) return
               if (option.value === currentShell()) return
-              serverSync.updateConfig({ shell: option.value })
+              serverSync().updateConfig({ shell: option.value })
             }}
           />
         </SettingsRowV2>
@@ -376,6 +361,20 @@ export const SettingsGeneralV2: Component = () => {
             />
           </div>
         </SettingsRowV2>
+
+        <Show when={mobile()}>
+          <SettingsRowV2
+            title={language.t("settings.general.row.mobileTitlebarBottom.title")}
+            description={language.t("settings.general.row.mobileTitlebarBottom.description")}
+          >
+            <div data-action="settings-mobile-titlebar-bottom">
+              <Switch
+                checked={settings.general.mobileTitlebarPosition() === "bottom"}
+                onChange={(checked) => settings.general.setMobileTitlebarPosition(checked ? "bottom" : "top")}
+              />
+            </div>
+          </SettingsRowV2>
+        </Show>
       </SettingsListV2>
     </div>
   )
@@ -398,18 +397,6 @@ export const SettingsGeneralV2: Component = () => {
         </SettingsRowV2>
 
         <SettingsRowV2
-          title={language.t("settings.general.row.showNavigation.title")}
-          description={language.t("settings.general.row.showNavigation.description")}
-        >
-          <div data-action="settings-show-navigation">
-            <Switch
-              checked={settings.general.showNavigation()}
-              onChange={(checked) => settings.general.setShowNavigation(checked)}
-            />
-          </div>
-        </SettingsRowV2>
-
-        <SettingsRowV2
           title={language.t("settings.general.row.showSearch.title")}
           description={language.t("settings.general.row.showSearch.description")}
         >
@@ -417,18 +404,6 @@ export const SettingsGeneralV2: Component = () => {
             <Switch
               checked={settings.general.showSearch()}
               onChange={(checked) => settings.general.setShowSearch(checked)}
-            />
-          </div>
-        </SettingsRowV2>
-
-        <SettingsRowV2
-          title={language.t("settings.general.row.showTerminal.title")}
-          description={language.t("settings.general.row.showTerminal.description")}
-        >
-          <div data-action="settings-show-terminal">
-            <Switch
-              checked={settings.general.showTerminal()}
-              onChange={(checked) => settings.general.setShowTerminal(checked)}
             />
           </div>
         </SettingsRowV2>
@@ -457,26 +432,28 @@ export const SettingsGeneralV2: Component = () => {
           </div>
         </SettingsRowV2>
 
-        <SettingsRowV2
-          title="Sidecar log level"
-          description="Log verbosity for the WSL sidecar server. Takes effect on next launch."
-        >
-          <SelectV2
-            appearance="inline"
-            data-action="settings-log-level"
-            options={logLevelOptions}
-            current={logLevelOptions.find((o) => o.value === logLevel.latest) ?? logLevelOptions[1]}
-            placement="bottom-end"
-            gutter={6}
-            value={(o) => o.value}
-            label={(o) => o.label}
-            onSelect={(option) => {
-              if (!option) return
-              mutateLogLevel(option.value)
-              void platform.storage?.(SETTINGS_STORE).setItem(LOG_LEVEL_KEY, option.value)
-            }}
-          />
-        </SettingsRowV2>
+        <Show when={desktop()}>
+          <SettingsRowV2
+            title="Sidecar log level"
+            description="Log verbosity for the WSL sidecar server. Takes effect on next launch."
+          >
+            <SelectV2
+              appearance="inline"
+              data-action="settings-log-level"
+              options={logLevelOptions}
+              current={logLevelOptions.find((o) => o.value === logLevel.latest) ?? logLevelOptions[1]}
+              placement="bottom-end"
+              gutter={6}
+              value={(o) => o.value}
+              label={(o) => o.label}
+              onSelect={(option) => {
+                if (!option) return
+                mutateLogLevel(option.value)
+                void platform.storage?.(SETTINGS_STORE).setItem(LOG_LEVEL_KEY, option.value)
+              }}
+            />
+          </SettingsRowV2>
+        </Show>
       </SettingsListV2>
     </div>
   )
@@ -744,6 +721,7 @@ export const SettingsGeneralV2: Component = () => {
     </div>
   )
 
+  // We can probably remove this, right?
   const DisplaySection = () => (
     <Show when={desktop()}>
       <div class="settings-v2-section">
@@ -758,26 +736,6 @@ export const SettingsGeneralV2: Component = () => {
               <Switch checked={pinchZoom.latest} onChange={onPinchZoomChange} />
             </div>
           </SettingsRowV2>
-
-          <Show when={linux()}>
-            <SettingsRowV2
-              title={
-                <div class="flex items-center gap-2">
-                  <span>{language.t("settings.general.row.wayland.title")}</span>
-                  <Tooltip value={language.t("settings.general.row.wayland.tooltip")} placement="top">
-                    <span class="text-text-weak">
-                      <Icon name="help" size="small" />
-                    </span>
-                  </Tooltip>
-                </div>
-              }
-              description={language.t("settings.general.row.wayland.description")}
-            >
-              <div data-action="settings-wayland">
-                <Switch checked={displayBackend.latest === "wayland"} onChange={onDisplayBackendChange} />
-              </div>
-            </SettingsRowV2>
-          </Show>
         </SettingsListV2>
       </div>
     </Show>
@@ -798,13 +756,13 @@ export const SettingsGeneralV2: Component = () => {
 
         <SoundsSection />
 
-        <UpdatesSection />
+        <Show when={desktop()}>
+          <UpdatesSection />
+        </Show>
 
         <DisplaySection />
 
-        <Show when={desktop()}>
-          <AdvancedSection />
-        </Show>
+        <AdvancedSection />
       </div>
     </>
   )
