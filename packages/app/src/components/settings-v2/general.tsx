@@ -148,6 +148,20 @@ export const SettingsGeneralV2: Component = () => {
     { initialValue: false },
   )
 
+  const SETTINGS_STORE = "opencode.settings"
+  const LOG_LEVEL_KEY = "logLevel"
+  const [logLevel, { mutate: mutateLogLevel }] = createResource(
+    () => (desktop() ? true : false),
+    () => platform.storage?.(SETTINGS_STORE).getItem(LOG_LEVEL_KEY) ?? null,
+    { initialValue: null as string | null },
+  )
+  const logLevelOptions = [
+    { value: "DEBUG", label: "Debug" },
+    { value: "INFO", label: "Info" },
+    { value: "WARN", label: "Warn" },
+    { value: "ERROR", label: "Error" },
+  ]
+
   onMount(() => {
     void theme.loadThemes()
   })
@@ -441,6 +455,27 @@ export const SettingsGeneralV2: Component = () => {
               onChange={(checked) => settings.general.setShowCustomAgents(checked)}
             />
           </div>
+        </SettingsRowV2>
+
+        <SettingsRowV2
+          title="Sidecar log level"
+          description="Log verbosity for the WSL sidecar server. Takes effect on next launch."
+        >
+          <SelectV2
+            appearance="inline"
+            data-action="settings-log-level"
+            options={logLevelOptions}
+            current={logLevelOptions.find((o) => o.value === logLevel.latest) ?? logLevelOptions[1]}
+            placement="bottom-end"
+            gutter={6}
+            value={(o) => o.value}
+            label={(o) => o.label}
+            onSelect={(option) => {
+              if (!option) return
+              mutateLogLevel(option.value)
+              void platform.storage?.(SETTINGS_STORE).setItem(LOG_LEVEL_KEY, option.value)
+            }}
+          />
         </SettingsRowV2>
       </SettingsListV2>
     </div>

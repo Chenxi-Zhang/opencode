@@ -1,11 +1,12 @@
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { app, utilityProcess } from "electron"
+import { spawn } from "node:child_process"
+import { app, dialog, utilityProcess } from "electron"
 import type { Details } from "electron"
 import { getLogger } from "./logging"
 import { getUserShell, loadShellEnv } from "./shell-env"
 import { getStore } from "./store"
-import { DEFAULT_SERVER_URL_KEY } from "./store-keys"
+import { DEFAULT_SERVER_URL_KEY, NATIVE_SERVER_BINARY_KEY } from "./store-keys"
 
 export type HealthCheck = { wait: Promise<void> }
 
@@ -39,6 +40,31 @@ export function setDefaultServerUrl(url: string | null) {
   }
 
   getStore().delete(DEFAULT_SERVER_URL_KEY)
+}
+
+export function getNativeServerBinary(): string | null {
+  const value = getStore().get(NATIVE_SERVER_BINARY_KEY)
+  return typeof value === "string" ? value : null
+}
+
+export function setNativeServerBinary(path: string | null) {
+  if (path) {
+    getStore().set(NATIVE_SERVER_BINARY_KEY, path)
+    return
+  }
+  getStore().delete(NATIVE_SERVER_BINARY_KEY)
+}
+
+export async function pickNativeServerBinary(): Promise<string | null> {
+  const result = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    title: "Select OpenCode executable",
+    filters: [{ name: "Executables", extensions: ["exe"] }],
+  })
+  if (result.canceled || !result.filePaths[0]) return null
+  const selected = result.filePaths[0]
+  setNativeServerBinary(selected)
+  return selected
 }
 
 export function preferAppEnv(userDataPath: string) {
@@ -178,6 +204,65 @@ export async function spawnLocalServer(
       },
     },
     health: { wait },
+  }
+}
+
+export async function spawnExternalServer(
+  binary: string,
+  hostname: string,
+  port: number,
+  password: string,
+  options: SpawnLocalServerOptions,
+) {
+  const env = createSidecarEnv()
+  env.OPENCODE_SERVER_USERNAME = "opencode"
+  env.OPENCODE_SERVER_PASSWORD = password
+  env.OPENCODE_CLIENT = "desktop"
+
+  const child = spawn(
+    binary,
+    ["serve", "--hostname", hostname, "--port", String(port), "--cors", "oc://renderer"],
+    { env, stdio: ["pipe", "pipe", "pipe"], windowsHide: true },
+  )
+
+  let exited = false
+  const exit = defer<number>()
+
+  child.once("exit", (code) => {
+    exited = true
+    options.onExit?.(code ?? -1)
+    exit.resolve(code ?? -1)
+  })
+  child.on("error", (error) => options.onStderr?.(`external server error: ${serializeError(error).message}`))
+  child.stdout?.on("data", (chunk: Buffer) => options.onStdout?.(chunk.toString("utf8").trimEnd()))
+  child.stderr?.on("data", (chunk: Buffer) => options.onStderr?.(chunk.toString("utf8").trimEnd()))
+
+  const url = `http://${hostname}:${port}`
+  const ready = async () => {
+    while (true) {
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      if (await checkHealth(url, password)) return
+    }
+  }
+
+  const gone = exit.promise.then((code) => {
+    throw new Error(`External server exited before health check passed with code ${code}`)
+  })
+
+  await Promise.race([ready(), gone]).catch((error) => {
+    if (!exited) child.kill()
+    throw error
+  })
+
+  return {
+    listener: {
+      stop: () => {
+        if (exited) return Promise.resolve()
+        child.kill()
+        return exit.promise.then(() => undefined)
+      },
+    },
+    health: { wait: Promise.resolve() },
   }
 }
 

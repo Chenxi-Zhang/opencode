@@ -793,6 +793,16 @@ export const dict = {
   "settings.desktop.wsl.title": "WSL integration",
   "settings.desktop.wsl.description": "Run the OpenCode server inside WSL on Windows.",
 
+  "settings.desktop.nativeBinary.title": "Custom server binary",
+  "settings.desktop.nativeBinary.row.title": "OpenCode executable",
+  "settings.desktop.nativeBinary.row.description": "Use a custom opencode.exe to run the local server with Bun runtime (enables all plugins). Requires restart.",
+  "settings.desktop.nativeBinary.select": "Select",
+  "settings.desktop.nativeBinary.change": "Change",
+  "settings.desktop.nativeBinary.clear": "Clear",
+  "settings.desktop.nativeBinary.picking": "Selecting...",
+  "settings.desktop.nativeBinary.toast.title": "Server binary updated",
+  "settings.desktop.nativeBinary.toast.description": "Restart the app to use the new server binary.",
+
   "settings.general.section.appearance": "Appearance",
   "settings.general.section.advanced": "Advanced",
   "settings.general.section.notifications": "System notifications",

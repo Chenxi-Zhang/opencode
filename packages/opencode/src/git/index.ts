@@ -11,8 +11,7 @@ const cfg = [
   "core.fsmonitor=false",
   "-c",
   "core.longpaths=true",
-  "-c",
-  "core.symlinks=true",
+  ...(process.platform === "win32" ? [] : ["-c", "core.symlinks=true"] as const),
   "-c",
   "core.quotepath=false",
 ] as const

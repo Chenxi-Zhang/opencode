@@ -5,12 +5,20 @@ import { app } from "electron"
 import { checkHealth } from "../server"
 import { type WslCommandLine, createOutputDecoder, resolveWslOpencode, shellEscape, wslArgs } from "./runtime"
 import { pollWslHealth } from "./startup"
+import { getStore } from "../store"
+import { SETTINGS_STORE, LOG_LEVEL_KEY } from "../store-keys"
 
 export type WslSidecar = {
   listener: { stop: () => void; onExit: (cb: (code: number | null, signal: NodeJS.Signals | null) => void) => void }
   url: string
   username: string | null
   password: string
+}
+
+function resolveLogLevel(): string {
+  const stored = getStore(SETTINGS_STORE).get(LOG_LEVEL_KEY)
+  if (typeof stored === "string" && stored) return stored.toUpperCase()
+  return process.env.OPENCODE_LOG_LEVEL ?? (app.isPackaged ? "WARN" : "INFO")
 }
 
 export async function spawnWslSidecar(
@@ -34,7 +42,9 @@ export async function spawnWslSidecar(
     `export OPENCODE_SERVER_USERNAME=${shellEscape(username)}`,
     `export OPENCODE_SERVER_PASSWORD=${shellEscape(password)}`,
     'export XDG_STATE_HOME="$HOME/.local/state"',
-    `exec ${shellEscape(opencode)} --print-logs --log-level ${app.isPackaged ? "WARN" : "INFO"} serve --hostname 0.0.0.0 --port ${port}`,
+    "[[ -f ~/.profile ]] && source ~/.profile >/dev/null 2>&1 || true",
+    "[[ -f ~/.bashrc ]] && source ~/.bashrc >/dev/null 2>&1 || true",
+    `exec ${shellEscape(opencode)} --print-logs --log-level ${shellEscape(resolveLogLevel())} serve --hostname 0.0.0.0 --port ${port}`,
   ].join("\n")
   const child = spawn("wsl", wslArgs(["bash", "-se"], distro), {
     stdio: ["pipe", "pipe", "pipe"],
